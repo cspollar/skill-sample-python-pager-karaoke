@@ -36,6 +36,12 @@ def _load_apl_document(file_path):
     with open(file_path) as f:
         return json.load(f)
 
+def _supports_apl(handler_input):
+    # type: (HandlerInput) -> bool
+    device = handler_input.request_envelope.context.system.device
+    apl_interface = device.supported_interfaces.alexa_presentation_apl
+    return bool(apl_interface)
+
 # Built-in Intent Handlers
 class LaunchRequestHandler(AbstractRequestHandler):
     """Handler for Skill Launch."""
@@ -68,36 +74,41 @@ class PagerIntentHandler(AbstractRequestHandler):
         logger.info("In PagerIntent")
 
         speech = 'This is the pager template!'
+        speech_no_apl = ('This is a sample that shows a pager template. ' + 
+                        'Try it on an Echo Show, Echo Spot or Fire TV device.')
 
-        handler_input.response_builder.speak(speech).add_directive(
-            RenderDocumentDirective(
-                token="pagerToken",
-                document=_load_apl_document("pager.json"),
-                datasources={
-                    'pagerTemplateData': {
-                        'type': 'object',
-                        'properties': {
-                            'hintString': 'try the blue cheese!'
-                        },
-                        'transformers': [
-                            {
-                                'inputPath': 'hintString',
-                                'transformer': 'textToHint'
-                            }
-                        ]
+        if _supports_apl(handler_input):
+            handler_input.response_builder.speak(speech).add_directive(
+                RenderDocumentDirective(
+                    token="pagerToken",
+                    document=_load_apl_document("pager.json"),
+                    datasources={
+                        'pagerTemplateData': {
+                            'type': 'object',
+                            'properties': {
+                                'hintString': 'try the blue cheese!'
+                            },
+                            'transformers': [
+                                {
+                                    'inputPath': 'hintString',
+                                    'transformer': 'textToHint'
+                                }
+                            ]
+                        }
                     }
-                }
+                )
+            ).add_directive(
+                ExecuteCommandsDirective(
+                    token="pagerToken",
+                    commands=[
+                        AutoPageCommand(
+                            component_id="pagerComponentId",
+                            duration=5000)
+                    ]
+                )
             )
-        ).add_directive(
-            ExecuteCommandsDirective(
-                token="pagerToken",
-                commands=[
-                    AutoPageCommand(
-                        component_id="pagerComponentId",
-                        duration=5000)
-                ]
-            )
-        )
+        else:
+            handler_input.response_builder.speak(speech_no_apl)
 
         return handler_input.response_builder.response
 
@@ -113,48 +124,53 @@ class KaraokeIntentHandler(AbstractRequestHandler):
         logger.info("In Karaoke Intent")
 
         speech = 'This is the karaoke template!'
+        speech_no_apl = ('This is a sample that shows a karaoke template. ' + 
+                        'Try it on an Echo Show, Echo Spot or Fire TV device.')
 
-        handler_input.response_builder.speak(speech).add_directive(
-            RenderDocumentDirective(
-                token="karaokeToken",
-                document=_load_apl_document("karaoke.json"),
-                datasources={
-                    'karaokeTemplateData': {
-                        'type': 'object',
-                        'objectId': 'karaokeSample',
-                        'properties': {
-                            'karaokeSsml': '<speak>We’re excited to announce a new video training series from A Cloud Guru on Alexa skill development. The free training series called Alexa Devs walks new developers and non-developers through how to build Alexa skills from start to finish. You’ll also learn how to enhance your skill using persistence, Speechcons, and SSML to create more engaging voice experiences for customers. Check out the first episode on how to build your first Alexa skill here.</speak>',
-                            'hintString': 'try the blue cheese!'
-                        },
-                        'transformers': [
-                            {
-                                'inputPath': 'karaokeSsml',
-                                'outputName': 'karaokeSpeech',
-                                'transformer': 'ssmlToSpeech'
+        if _supports_apl(handler_input):
+            handler_input.response_builder.speak(speech).add_directive(
+                RenderDocumentDirective(
+                    token="karaokeToken",
+                    document=_load_apl_document("karaoke.json"),
+                    datasources={
+                        'karaokeTemplateData': {
+                            'type': 'object',
+                            'objectId': 'karaokeSample',
+                            'properties': {
+                                'karaokeSsml': '<speak>We’re excited to announce a new video training series from A Cloud Guru on Alexa skill development. The free training series called Alexa Devs walks new developers and non-developers through how to build Alexa skills from start to finish. You’ll also learn how to enhance your skill using persistence, Speechcons, and SSML to create more engaging voice experiences for customers. Check out the first episode on how to build your first Alexa skill here.</speak>',
+                                'hintString': 'try the blue cheese!'
                             },
-                            {
-                                'inputPath': 'karaokeSsml',
-                                'outputName': 'karaokeText',
-                                'transformer': 'ssmlToText'
-                            },
-                            {
-                                'inputPath': 'hintString',
-                                'transformer': 'textToHint'
-                            }
-                        ]
+                            'transformers': [
+                                {
+                                    'inputPath': 'karaokeSsml',
+                                    'outputName': 'karaokeSpeech',
+                                    'transformer': 'ssmlToSpeech'
+                                },
+                                {
+                                    'inputPath': 'karaokeSsml',
+                                    'outputName': 'karaokeText',
+                                    'transformer': 'ssmlToText'
+                                },
+                                {
+                                    'inputPath': 'hintString',
+                                    'transformer': 'textToHint'
+                                }
+                            ]
+                        }
                     }
-                }
+                )
+            ).add_directive(
+                ExecuteCommandsDirective(
+                    token="karaokeToken",
+                    commands=[
+                        SpeakItemCommand(
+                            component_id="karaokespeechtext",
+                            highlight_mode=HighlightMode.LINE)
+                    ]
+                )
             )
-        ).add_directive(
-            ExecuteCommandsDirective(
-                token="karaokeToken",
-                commands=[
-                    SpeakItemCommand(
-                        component_id="karaokespeechtext",
-                        highlight_mode=HighlightMode.LINE)
-                ]
-            )
-        )
+        else:
+            handler_input.response_builder.speak(speech_no_apl)            
 
         return handler_input.response_builder.response
 
@@ -183,29 +199,32 @@ class DeviceIntentHandler(AbstractRequestHandler):
             speech += 'mobile landscape small'
         else: 
             speech += 'echo device!'
-
-        handler_input.response_builder.speak(speech).add_directive(
-            RenderDocumentDirective(
-                document=_load_apl_document("devices.json"),
-                datasources={
-                    'deviceTemplateData': {
-                        'type': 'object',
-                        'objectId': 'deviceSample',
-                        'properties': {
-                            'deviceName': viewport.get_viewport_profile(
-                                handler_input.request_envelope),
-                            'hintString': 'try and buy more devices!'
-                        },
-                        'transformers': [
-                            {
-                                'inputPath': 'hintString',
-                                'transformer': 'textToHint'
-                            }
-                        ]
+        
+        if _supports_apl(handler_input):
+            handler_input.response_builder.speak(speech).add_directive(
+                RenderDocumentDirective(
+                    document=_load_apl_document("devices.json"),
+                    datasources={
+                        'deviceTemplateData': {
+                            'type': 'object',
+                            'objectId': 'deviceSample',
+                            'properties': {
+                                'deviceName': viewport.get_viewport_profile(
+                                    handler_input.request_envelope),
+                                'hintString': 'try and buy more devices!'
+                            },
+                            'transformers': [
+                                {
+                                    'inputPath': 'hintString',
+                                    'transformer': 'textToHint'
+                                }
+                            ]
+                        }
                     }
-                }
+                )
             )
-        )
+        else:
+            handler_input.response_builder.speak(speech)
 
         return handler_input.response_builder.response
 
